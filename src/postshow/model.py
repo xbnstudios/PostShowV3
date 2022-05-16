@@ -4,6 +4,7 @@ import datetime
 import re
 import threading
 import mutagen.id3
+import mutagen.mp3
 import subprocess
 import mimetypes
 import os.path
@@ -13,7 +14,7 @@ class Chapter(object):
     """A podcast chapter."""
 
     def __init__(
-            self, start: int, end: int, url=None, image=None, text=None, indexed=True
+        self, start: int, end: int, url=None, image=None, text=None, indexed=True
     ):
         """Create a new Chapter.
 
@@ -67,12 +68,19 @@ class Chapter(object):
         )
 
 
-class MP3Tagger:
+class MP3Tagger(threading.Thread):
     """Tag an MP3."""
 
-    def __init__(self, path: str):
+    def __init__(self):
         """Create a new tagger."""
+        super().__init__()
+        self.path = None
+        self.tag = None
+        self.progress_signal = None
+
+    def setup(self, path: str, progress_signal):
         self.path = path
+        self.progress_signal = progress_signal
         # Create an ID3 tag if none exists
         try:
             self.tag = mutagen.id3.ID3(path)
@@ -89,9 +97,9 @@ class MP3Tagger:
     def _no_padding(arg):
         return 0
 
-    def save(self):
-        """Save the tag."""
+    def run(self) -> None:
         self.tag.save(self.path, v2_version=3, padding=self._no_padding)
+        self.progress_signal.progressed.emit(101)
 
     def set_title(self, title: str) -> None:
         """Set the title of the MP3."""
@@ -205,8 +213,9 @@ class MP3Encoder(threading.Thread):
         self.percent = 0
         self.started = False
         self.finished = False
+        self.progress_updater = None
 
-    def setup(self, infile: str, outfile: str, bitrate: str):
+    def setup(self, infile: str, outfile: str, bitrate: str, progress_updater):
         """Configure the input and output files, and the encoder bitrate.
 
         :param infile: Path to WAV file.
@@ -217,6 +226,7 @@ class MP3Encoder(threading.Thread):
         self.outfile = outfile
         self.bitrate = bitrate
         self.matcher = re.compile(r"\(([0-9]?[0-9 ][0-9])%\)")
+        self.progress_updater = progress_updater
 
     def run(self):
         self.started = True
@@ -235,9 +245,11 @@ class MP3Encoder(threading.Thread):
                 continue
             percent = int(groups[-1])
             self.percent = percent
+            self.progress_updater.set_progress(percent)
             if percent == 100 and self.p.poll() is not None:
                 break
         self.finished = True
+        self.progress_updater.set_finished()
 
     def request_stop(self):
         if self.started and self.p is not None:
@@ -259,10 +271,17 @@ class EpisodeMetadata(object):
         self.language = None
         self.composer = None
         self.accompaniment = None
-        self.date = None
+        self.year = None
         self.comment = None
         self.chapters = []
         self.toc = []
+
+    def __getitem__(self, key):
+        return self.__getattribute__(key)
+
+    def __setitem__(self, key, value):
+        """This is bad, and rest assured that I felt bad writing it."""
+        return self.__setattr__(key, value)
 
 
 class MCS:
@@ -335,7 +354,7 @@ class MCS:
         url = None
         # url_parsed = None
         if "|" in text:
-            url = text[text.rindex("|") + 1:]
+            url = text[text.rindex("|") + 1 :]
             text = text[: text.rindex("|")]
             # url_parsed = urllib.parse.urlparse(url)
         return text, url
@@ -479,7 +498,7 @@ class MCS:
                         minutes,
                         seconds,
                         fraction,
-                        )
+                    )
                 )
 
     def _save_simple(self, path: str):

@@ -1,7 +1,8 @@
 import sys
+import platform
 
 import random
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QObject, Signal
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
     QApplication,
@@ -24,6 +25,17 @@ from PySide6.QtWidgets import (
     QWidget,
     QWizardPage,
 )
+
+
+class ProgressUpdateEmitter(QObject):
+    progressed = Signal(int)
+    encoder_finished = Signal()
+
+    def set_progress(self, value):
+        self.progressed.emit(value)
+
+    def set_finished(self):
+        self.encoder_finished.emit()
 
 
 class EncoderProgressPage(QWizardPage):
@@ -62,17 +74,47 @@ class EncoderProgressPage(QWizardPage):
         "call your developers good dogs",
     ]
 
-    def __init__(self):
+    def __init__(self, controller):
         super().__init__()
+
+        self.controller = controller
 
         self.setTitle("Encoding…")
         feel_free_label = QLabel(
             self.MESSAGE_TEMPLATE.format(random.choice(self.ACTIVITIES))
         )
+        feel_free_label.setWordWrap(True)
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 101)
+        self.controller.encoder_progress_signal.progressed.connect(
+            self.progress_bar.setValue
+        )
+        self.controller.encoder_progress_signal.progressed.connect(
+            self.emit_complete_when_finished
+        )
+        self.controller.encoder_progress_signal.encoder_finished.connect(
+            self.finish_encoder
+        )
 
         main_layout = QVBoxLayout()
         main_layout.addWidget(feel_free_label)
+        if platform.system() == "Darwin":
+            mac_label = QLabel(
+                "Because of a macOS-related bug, LAME may falsely report its progress "
+                "as 100% for the duration of the encoding."
+            )
+            mac_label.setWordWrap(True)
+            main_layout.addWidget(mac_label)
         main_layout.addWidget(self.progress_bar)
         self.setLayout(main_layout)
+
+    def finish_encoder(self):
+        self.controller.progress_view_finished()
+        self.controller.do_tag()
+
+    def isComplete(self) -> bool:
+        return self.progress_bar.value() == 101
+
+    def emit_complete_when_finished(self, value):
+        if value == 101:
+            self.wizard().next()

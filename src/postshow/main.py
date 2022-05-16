@@ -1,21 +1,36 @@
 #!/usr/bin/env python3
 # coding: utf-8
 
+# To Future Readers:
+# I didn't have sufficient motivation to rewrite this application from scratch. I
+# built it out of the carcass of the prior version, which was a console application
+# using urwid as the UI library.  This resulted in many sub-optimal software
+# architecture decisions, several of which were cargo-culted into this application
+# out of expediency.
+#
+# If you would like to ask questions about what things do (or complain about what I'm
+# putting you through), contact awoo@s0ph0s.dog or t.me/s0ph0s.
+
 import sys
+import traceback
+
 from PySide6.QtWidgets import (
     QApplication,
+    QMessageBox,
+    QErrorMessage,
     QWizard,
 )
 import IOSetupPage
 import MetadataPage
 import EncoderProgressPage
-import FinalizingPage
+import FinishPage
 import config
 import model
 
 import os
 import tempfile
 import datetime
+import argparse
 
 
 class Controller:
@@ -33,21 +48,25 @@ class Controller:
     8. Exit
     """
 
-    def __init__(self, args, config):
+    def __init__(self, args, config_data):
         self.encoder = model.MP3Encoder()
 
         self.args = args
-        self.config = config
+        self.config_data = config_data
         self.skip_encoding = False
         self.metadata = None
         self.mp3_path = None
         self.chapters = None
         self.tmp_path = None
+        self.outdir = None
+        self.tagger = None
+        self.profile = "default"
+        self.encoder_progress_signal = EncoderProgressPage.ProgressUpdateEmitter()
 
     def exit_handler(self):
         self.encoder.request_stop()
 
-    def start_encoder(self):
+    def start_encoder(self, wav_path):
         # Encode the mp3 to a temp file first, then move it later
         self.tmp_path = tempfile.TemporaryDirectory()
         if not self.skip_encoding:
@@ -55,9 +74,10 @@ class Controller:
                 "mp3", parent=self.tmp_path.name
             )
             self.encoder.setup(
-                self.args.wav,
+                wav_path,
                 self.mp3_path,
-                self.config.get(self.args.profile, "bitrate"),
+                self.config_data.get(self.profile, "bitrate"),
+                self.encoder_progress_signal,
             )
             # Start the encoder on its own thread
             self.encoder.start()
@@ -65,11 +85,8 @@ class Controller:
     def set_metadata(self, metadata: model.EpisodeMetadata):
         self.metadata = metadata
         # Metadata conversion
-        self.complete_metadata()
+        self.complete_metadata(self.profile)
         self.build_chapters()
-
-    def finalize_metadata(self, metadata: model.EpisodeMetadata):
-        self.metadata = metadata
 
     def exit(self):
         if self.encoder is not None and self.encoder.started:
@@ -85,9 +102,9 @@ class Controller:
         """
         if parent is None:
             return os.path.join(
-                self.args.outdir,
-                self.config.get(self.args.profile, "filename").format(
-                    slug=self.config.get(self.args.profile, "slug").lower(),
+                self.outdir,
+                self.config_data.get(self.profile, "filename").format(
+                    slug=self.config_data.get(self.profile, "slug").lower(),
                     epnum=self.metadata.number,
                     ext=ext,
                 ),
@@ -100,7 +117,7 @@ class Controller:
         mcs = model.MCS(
             metadata=self.metadata, media_filename=self.build_output_file_path("mp3")
         )
-        mcs.load(self.args.markers)
+        mcs.load(self.markers_file)
         self.chapters = mcs.get()
         mcs.save(self.build_output_file_path("lrc"), model.MCS.LRC)
         mcs.save(self.build_output_file_path("cue"), model.MCS.CUE)
@@ -112,7 +129,9 @@ class Controller:
 
         8. Exit
         """
-        t = model.MP3Tagger(self.mp3_path)
+        t = model.MP3Tagger()
+        self.tagger = t
+        t.setup(self.mp3_path, self.encoder_progress_signal)
         t.set_title(self.metadata.title)
         t.set_album(self.metadata.album)
         t.set_artist(self.metadata.artist)
@@ -127,15 +146,15 @@ class Controller:
             t.add_comment(self.metadata.language, "track list", self.metadata.comment)
             if self.metadata.comment is not None:
                 t.add_lyrics(self.metadata.language, "track list", self.metadata.lyrics)
-        if self.config.getboolean(self.args.profile, "write_date"):
-            t.set_date(datetime.datetime.now().strftime("%Y"))
-        if self.config.getboolean(self.args.profile, "write_trackno"):
+        if self.config_data.getboolean(self.profile, "write_date"):
+            t.set_date(self.metadata.year)
+        if self.config_data.getboolean(self.profile, "write_trackno"):
             t.set_trackno(self.metadata.track)
         if self.chapters is not None:
             t.add_chapters(self.chapters)
-        if "cover_art" in self.config[self.args.profile].keys():
-            t.set_cover_art(self.config.get(self.args.profile, "cover_art"))
-        t.save()
+        if "cover_art" in self.config_data[self.profile].keys():
+            t.set_cover_art(self.config_data.get(self.profile, "cover_art"))
+        t.start()
 
     def progress_view_finished(self):
         """Do steps 6 and 7.
@@ -158,60 +177,92 @@ class Controller:
             )
             self.tmp_path.cleanup()
 
-    def encoder_finished(self) -> bool:
-        """Return true if the encoder is finished."""
-        return self.encoder.finished
-
-    def get_encoder_percent(self) -> int:
-        return self.encoder.percent
-
-    def complete_metadata(self) -> None:
+    def complete_metadata(self, profile_name: str) -> None:
         """Complete the metadata using the config file.
 
         Take the information from the config file and the information entered by
         the user and combine them into the complete information for this
         episode.
         """
-        self.metadata.title = self.config.get(self.args.profile, "title").format(
-            slug=self.config.get(self.args.profile, "slug"),
+        self.metadata.title = self.config_data.get(profile_name, "title").format(
+            slug=self.config_data.get(profile_name, "slug"),
             epnum=self.metadata.number,
             name=self.metadata.name,
         )
-        self.metadata.album = self.config.get(self.args.profile, "album")
-        self.metadata.artist = self.config.get(self.args.profile, "artist")
-        self.metadata.season = self.config.get(self.args.profile, "season")
-        self.metadata.genre = self.config.get(self.args.profile, "genre")
-        self.metadata.language = self.config.get(self.args.profile, "language")
-        self.metadata.composer = self.config.get(
-            self.args.profile, "composer", fallback=None
+        self.metadata.album = self.config_data.get(profile_name, "album")
+        self.metadata.artist = self.config_data.get(profile_name, "artist")
+        self.metadata.season = self.config_data.get(profile_name, "season")
+        self.metadata.genre = self.config_data.get(profile_name, "genre")
+        self.metadata.language = self.config_data.get(profile_name, "language")
+        self.metadata.composer = self.config_data.get(
+            profile_name, "composer", fallback=None
         )
-        self.metadata.accompaniment = self.config.get(
-            self.args.profile, "accompaniment", fallback=None
+        self.metadata.accompaniment = self.config_data.get(
+            profile_name, "accompaniment", fallback=None
         )
-        if self.config.getboolean(self.args.profile, "write_date"):
-            self.metadata.date = datetime.datetime.now().strftime("%Y")
-        if self.config.getboolean(self.args.profile, "write_trackno"):
+        if self.config_data.getboolean(profile_name, "write_date"):
+            self.metadata.year = datetime.datetime.now().strftime("%Y")
+        if self.config_data.getboolean(profile_name, "write_trackno"):
             self.metadata.track = self.metadata.number
-        if self.config.getboolean(self.args.profile, "lyrics_equals_comment"):
+        if self.config_data.getboolean(profile_name, "lyrics_equals_comment"):
             self.metadata.comment = self.metadata.lyrics
 
 
+def parse_args() -> argparse.Namespace:
+    """Parse arguments to this program."""
+    parser = argparse.ArgumentParser(
+        description="Convert and tag WAVs and chapter metadata for podcasts."
+    )
+    parser.add_argument(
+        "-c",
+        "--config",
+        help="configuration file to use, defaults to $HOME/.config/postshow.ini",
+        default=os.path.expandvars("$HOME/.config/postshow.ini"),
+    )
+    args = parser.parse_args()
+    errors = []
+    if not os.path.exists(args.config):
+        errors.append("Configuration file ({}) does not exist".format(args.config))
+    if len(errors) > 0:
+        raise model.PostShowError(";\n".join(errors))
+    return args
+
+
 def main():
-    config_data = config.check_config()
-    controller = Controller()
     app = QApplication([])
-    wizard = PostShowWizard()
-    wizard.show()
-    sys.exit(app.exec())
+    try:
+        args = parse_args()
+        config_data = config.check_config(args.config)
+        controller = Controller(args, config_data)
+        wizard = PostShowWizard(controller)
+        wizard.show()
+        sys.exit(app.exec())
+    except model.PostShowError as pse:
+        error_box = QMessageBox(
+            QMessageBox.Critical,
+            "PostShow could not continue",
+            "An error occurred that could not be automatically resolved.",
+        )
+        help_button = error_box.addButton("Help", QMessageBox.HelpRole)
+        quit_button = error_box.addButton("Quit", QMessageBox.AcceptRole)
+        error_box.exec()
+        if error_box.clickedButton() == help_button:
+            qem = QErrorMessage()
+            qem.showMessage(
+                "<br>".join(traceback.format_exception(None, pse, pse.__traceback__))
+            )
+            qem.exec()
+        exit(1)
 
 
 class PostShowWizard(QWizard):
-    def __init__(self):
+    def __init__(self, controller):
         super().__init__()
-        self.addPage(IOSetupPage.InputOutputPage())
-        self.addPage(MetadataPage.MetadataPage())
-        self.addPage(EncoderProgressPage.EncoderProgressPage())
-        self.addPage(FinalizingPage.FinalizingPage())
+        self.setButtonText(QWizard.CommitButton, "Encode")
+        self.addPage(IOSetupPage.InputOutputPage(controller))
+        self.addPage(MetadataPage.MetadataPage(controller))
+        self.addPage(EncoderProgressPage.EncoderProgressPage(controller))
+        self.addPage(FinishPage.FinishPage())
         self.setWindowTitle("Encode and Tag Podcast Episode")
 
 

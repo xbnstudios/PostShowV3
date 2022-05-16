@@ -24,11 +24,14 @@ from PySide6.QtWidgets import (
     QWidget,
     QWizardPage,
 )
+import model
 
 
 class InputOutputPage(QWizardPage):
-    def __init__(self):
+    def __init__(self, controller):
         super().__init__()
+
+        self.controller = controller
 
         self.setTitle("Choose Input and Output Files")
         self.create_input_box()
@@ -44,6 +47,7 @@ class InputOutputPage(QWizardPage):
         self.setLayout(main_layout)
 
     def show_file_chooser_for_field(self, field, title: str, filters: str):
+        # TODO: save last file location for a particular field and open there next time
         file_name = QFileDialog.getOpenFileName(
             self, title, os.path.expanduser("~"), filters
         )
@@ -51,6 +55,7 @@ class InputOutputPage(QWizardPage):
         field.setText(file_name[0])
 
     def show_folder_chooser_for_field(self, field, title: str):
+        # TODO: default to last location, warn if expected names exist
         folder_name = QFileDialog.getExistingDirectory(
             self, title, os.path.expanduser("~")
         )
@@ -69,17 +74,18 @@ class InputOutputPage(QWizardPage):
         # layout's spacing being set to 0, we have to override the inherited
         # value.
         wav_chooser_layout.setSpacing(9)
-        self.wav_file_line = QLineEdit()
-        self.wav_choose_button = QPushButton("Choose File")
-        self.wav_choose_button.clicked.connect(
+        self.recording_file_line = QLineEdit()
+        self.recording_choose_button = QPushButton("Choose File")
+        self.recording_choose_button.clicked.connect(
             lambda: self.show_file_chooser_for_field(
-                self.wav_file_line,
+                self.recording_file_line,
                 "Final episode recording (WAV or MP3)",
                 "Audio file (*.wav *.mp3)",
             )
         )
-        wav_chooser_layout.addWidget(self.wav_file_line)
-        wav_chooser_layout.addWidget(self.wav_choose_button)
+        wav_chooser_layout.addWidget(self.recording_file_line)
+        wav_chooser_layout.addWidget(self.recording_choose_button)
+        self.registerField("recording_file*", self.recording_file_line)
 
         layout.addWidget(wav_label)
         layout.addLayout(wav_chooser_layout)
@@ -101,6 +107,7 @@ class InputOutputPage(QWizardPage):
         )
         chap_chooser_layout.addWidget(self.chap_file_line)
         chap_chooser_layout.addWidget(self.chap_choose_button)
+        self.registerField("chap_file*", self.chap_file_line)
 
         layout.addWidget(chap_label)
         layout.addLayout(chap_chooser_layout)
@@ -115,21 +122,29 @@ class InputOutputPage(QWizardPage):
         # Show Template
         template_label = QLabel("Show metadata template:")
         self.template_box = QComboBox()
-        self.template_box.insertItem(0, QIcon(), "default")
+        for section_name in self.controller.config_data:
+            # ConfigParser adds this section, and we don't use it.
+            if section_name == "DEFAULT":
+                continue
+            show_slug = self.controller.config_data[section_name]["slug"]
+            self.template_box.addItem(QIcon(), show_slug, section_name)
         layout.addWidget(template_label)
         layout.addWidget(self.template_box)
+        self.registerField("template", self.template_box)
 
         # Episode Number
         number_label = QLabel("Episode number:")
         self.number_line = QLineEdit()
         layout.addWidget(number_label)
         layout.addWidget(self.number_line)
+        self.registerField("episode_number*", self.number_line)
 
         # Episode Title
         title_label = QLabel("Episode title:")
         self.title_line = QLineEdit()
         layout.addWidget(title_label)
         layout.addWidget(self.title_line)
+        self.registerField("episode_title*", self.title_line)
 
         self._metadata_group_box.setLayout(layout)
 
@@ -138,7 +153,6 @@ class InputOutputPage(QWizardPage):
         layout = QVBoxLayout()
         layout.setSpacing(0)
 
-        # WAV File Entry
         outfolder_label = QLabel("Output folder:")
         outfolder_chooser_layout = QHBoxLayout()
         outfolder_chooser_layout.setSpacing(9)
@@ -146,14 +160,29 @@ class InputOutputPage(QWizardPage):
         self.outfolder_choose_button = QPushButton("Choose Folder")
         self.outfolder_choose_button.clicked.connect(
             lambda: self.show_folder_chooser_for_field(
-                self.outfolder_folder_line,
-                "Output folder"
+                self.outfolder_folder_line, "Output folder"
             )
         )
         outfolder_chooser_layout.addWidget(self.outfolder_folder_line)
         outfolder_chooser_layout.addWidget(self.outfolder_choose_button)
+        self.registerField("outfolder*", self.outfolder_folder_line)
 
         layout.addWidget(outfolder_label)
         layout.addLayout(outfolder_chooser_layout)
 
         self._output_group_box.setLayout(layout)
+
+    def validatePage(self) -> bool:
+        self.controller.profile = self.template_box.currentData()
+        recording_file_path = self.recording_file_line.text()
+        if recording_file_path.endswith(".wav"):
+            self.controller.start_encoder(recording_file_path)
+        else:
+            self.controller.skip_encoding = True
+        metadata = model.EpisodeMetadata(
+            self.number_line.text(), self.title_line.text()
+        )
+        self.controller.outdir = self.outfolder_folder_line.text()
+        self.controller.markers_file = self.chap_file_line.text()
+        self.controller.set_metadata(metadata)
+        return True
