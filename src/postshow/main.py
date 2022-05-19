@@ -13,6 +13,7 @@
 
 import sys
 import traceback
+from typing import List
 
 from PySide6.QtCore import QStandardPaths, QUrl
 from PySide6.QtGui import QDesktopServices
@@ -68,6 +69,16 @@ class Controller:
     def exit_handler(self):
         self.encoder.request_stop()
 
+    def reset_encoder(self):
+        self.encoder.request_stop()
+        try:
+            self.encoder.join()
+        except RuntimeError:
+            print("I tried to stop the encoder, but it wasn't running. This is fine.")
+        self.encoder = model.MP3Encoder()
+        self.output_files = []
+        print("Encoder reset")
+
     def start_encoder(self, wav_path):
         # Encode the mp3 to a temp file first, then move it later
         self.tmp_path = tempfile.TemporaryDirectory()
@@ -84,11 +95,21 @@ class Controller:
             # Start the encoder on its own thread
             self.encoder.start()
 
+    def check_before_wreck(self) -> List[str]:
+        outfiles = [self.build_output_file_path("mp3"),
+                    self.build_output_file_path("lrc"),
+                    self.build_output_file_path("cue"),
+                    self.build_output_file_path("txt")]
+        files_that_exist = []
+        for file in outfiles:
+            if os.path.exists(file):
+                files_that_exist.append(file)
+        return files_that_exist
+
     def set_metadata(self, metadata: model.EpisodeMetadata):
         self.metadata = metadata
         # Metadata conversion
         self.complete_metadata(self.profile)
-        self.build_chapters()
 
     def exit(self):
         if self.encoder is not None and self.encoder.started:

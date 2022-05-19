@@ -1,5 +1,6 @@
 import sys
 
+from typing import List
 import os.path
 from PySide6.QtCore import Qt, Slot, QStandardPaths
 from PySide6.QtGui import QIcon
@@ -17,6 +18,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMenu,
     QMenuBar,
+    QMessageBox,
     QPushButton,
     QSpinBox,
     QTextEdit,
@@ -58,6 +60,7 @@ class InputOutputPage(QWizardPage):
     def initializePage(self) -> None:
         self.file_chooser_memory = configparser.ConfigParser()
         self.file_chooser_memory.read(self.MEMORY_FILE_PATH)
+        self.controller.reset_encoder()
 
     def show_file_chooser_for_field(
         self, field, field_config_key: str, title: str, filters: str
@@ -73,7 +76,6 @@ class InputOutputPage(QWizardPage):
             self.file_chooser_memory.set("DEFAULT", field_config_key, new_path)
 
     def show_folder_chooser_for_field(self, field, field_config_key: str, title: str):
-        # TODO: default to last location, warn if expected names exist
         default_path = self.file_chooser_memory.get(
             "DEFAULT", field_config_key, fallback=os.path.expanduser("~")
         )
@@ -195,19 +197,41 @@ class InputOutputPage(QWizardPage):
 
         self._output_group_box.setLayout(layout)
 
+    def confirm_overwrite(self, existing_files: List[str]) -> bool:
+        """Ask the user whether they want to overwrite existing files.
+        :return: True if they want to destroy data, False if they want to go back and try again.
+        """
+        confirm_box = QMessageBox(
+            QMessageBox.Warning,
+            "Overwrite existing files?",
+            "The output folder you selected contains files {} that will be "
+            "overwritten if you continue.".format(existing_files)
+        )
+        overwrite = confirm_box.addButton("Overwrite", QMessageBox.DestructiveRole)
+        cancel = confirm_box.addButton("Cancel", QMessageBox.RejectRole)
+        confirm_box.exec()
+        return confirm_box.clickedButton() == overwrite
+
     def validatePage(self) -> bool:
         self.controller.profile = self.template_box.currentData()
         recording_file_path = self.recording_file_line.text()
-        if recording_file_path.endswith(".wav"):
-            self.controller.start_encoder(recording_file_path)
-        else:
-            self.controller.skip_encoding = True
+        self.controller.outdir = self.outfolder_folder_line.text()
+        self.controller.markers_file = self.chap_file_line.text()
         metadata = model.EpisodeMetadata(
             self.number_line.text(), self.title_line.text()
         )
-        self.controller.outdir = self.outfolder_folder_line.text()
-        self.controller.markers_file = self.chap_file_line.text()
         self.controller.set_metadata(metadata)
+        files_that_exist = self.controller.check_before_wreck()
+        if len(files_that_exist) > 0:
+            if not self.confirm_overwrite(files_that_exist):
+                return False
+
+        if recording_file_path.endswith(".wav"):
+            self.controller.reset_encoder()
+            self.controller.start_encoder(recording_file_path)
+        else:
+            self.controller.skip_encoding = True
+        self.controller.build_chapters()
         with open(self.MEMORY_FILE_PATH, "w") as mf:
             self.file_chooser_memory.write(mf)
         return True
