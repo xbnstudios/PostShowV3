@@ -69,6 +69,8 @@ class InputOutputPage(QWizardPage):
             "DEFAULT", field_config_key, fallback=os.path.expanduser("~")
         )
         file_name = QFileDialog.getOpenFileName(self, title, default_path, filters)[0]
+        # Because Qt returns it with / instead of \ on Windows :/
+        file_name = os.path.abspath(file_name)
         print("show_file_chooser_for_field:", file_name)
         if file_name != "":
             field.setText(file_name)
@@ -80,6 +82,8 @@ class InputOutputPage(QWizardPage):
             "DEFAULT", field_config_key, fallback=os.path.expanduser("~")
         )
         folder_name = QFileDialog.getExistingDirectory(self, title, default_path)
+        # Because Qt returns it with / instead of \ on Windows :/
+        folder_name = os.path.abspath(folder_name)
         print("show_folder_chooser_for_field:", folder_name)
         if folder_name != "":
             field.setText(folder_name)

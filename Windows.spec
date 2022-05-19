@@ -5,10 +5,10 @@ block_cipher = None
 
 
 a = Analysis(
-    ['src/postshow/main.py'],
+    ['src\\postshow\\main.py'],
     pathex=[],
     binaries=[],
-    datas=[('data/template_config.ini', 'data'), ('vendor/lame', 'vendor')],
+    datas=[('data/template_config.ini', 'data'), ('vendor/lame.exe', 'vendor')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -47,10 +47,4 @@ coll = COLLECT(
     upx=True,
     upx_exclude=[],
     name='PostShow',
-)
-app = BUNDLE(
-    coll,
-    name='PostShow.app',
-    icon=None,
-    bundle_identifier="dog.s0ph0s.postshow.v3",
 )

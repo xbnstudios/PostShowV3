@@ -200,7 +200,7 @@ class Controller:
         # done
         if not self.skip_encoding:
             self.encoder.join()
-            os.rename(
+            shutil.move(
                 self.build_output_file_path("mp3", parent=self.tmp_path.name),
                 self.mp3_path,
             )
