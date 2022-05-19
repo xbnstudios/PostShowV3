@@ -77,6 +77,7 @@ class MP3Tagger(threading.Thread):
         self.path = None
         self.tag = None
         self.progress_signal = None
+        self.length_ms = None
 
     def setup(self, path: str, progress_signal):
         self.path = path
@@ -90,8 +91,8 @@ class MP3Tagger(threading.Thread):
             self.tag = broken.ID3()
         # Determine the length of the MP3 and write it to a TLEN frame
         mp3 = mutagen.mp3.MP3(path)
-        length = int(round(mp3.info.length * 1000, 0))
-        self.tag.add(mutagen.id3.TLEN(text=str(length)))
+        self.length_ms = int(round(mp3.info.length * 1000, 0))
+        self.tag.add(mutagen.id3.TLEN(text=str(self.length_ms)))
 
     @staticmethod
     def _no_padding(arg):

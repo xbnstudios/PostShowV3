@@ -62,6 +62,7 @@ class Controller:
         self.tagger = None
         self.profile = "default"
         self.encoder_progress_signal = EncoderProgressPage.ProgressUpdateEmitter()
+        self.output_files = []
 
     def exit_handler(self):
         self.encoder.request_stop()
@@ -119,9 +120,15 @@ class Controller:
         )
         mcs.load(self.markers_file)
         self.chapters = mcs.get()
-        mcs.save(self.build_output_file_path("lrc"), model.MCS.LRC)
-        mcs.save(self.build_output_file_path("cue"), model.MCS.CUE)
-        mcs.save(self.build_output_file_path("txt"), model.MCS.SIMPLE)
+        lrc_path = self.build_output_file_path("lrc")
+        cue_path = self.build_output_file_path("cue")
+        txt_path = self.build_output_file_path("txt")
+        mcs.save(lrc_path, model.MCS.LRC)
+        mcs.save(cue_path, model.MCS.CUE)
+        mcs.save(txt_path, model.MCS.SIMPLE)
+        self.output_files.append(lrc_path)
+        self.output_files.append(cue_path)
+        self.output_files.append(txt_path)
         self.metadata.lyrics = "\n".join([chapter.text for chapter in self.chapters])
 
     def do_tag(self):
@@ -175,6 +182,7 @@ class Controller:
                 self.build_output_file_path("mp3", parent=self.tmp_path.name),
                 self.mp3_path,
             )
+            self.output_files.append(self.mp3_path)
             self.tmp_path.cleanup()
 
     def complete_metadata(self, profile_name: str) -> None:
@@ -206,6 +214,9 @@ class Controller:
             self.metadata.track = self.metadata.number
         if self.config_data.getboolean(profile_name, "lyrics_equals_comment"):
             self.metadata.comment = self.metadata.lyrics
+
+    def get_mp3_length_ms(self):
+        return self.tagger.length_ms
 
 
 def parse_args() -> argparse.Namespace:
@@ -262,7 +273,7 @@ class PostShowWizard(QWizard):
         self.addPage(IOSetupPage.InputOutputPage(controller))
         self.addPage(MetadataPage.MetadataPage(controller))
         self.addPage(EncoderProgressPage.EncoderProgressPage(controller))
-        self.addPage(FinishPage.FinishPage())
+        self.addPage(FinishPage.FinishPage(controller))
         self.setWindowTitle("Encode and Tag Podcast Episode")
 
 
