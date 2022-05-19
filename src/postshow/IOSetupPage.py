@@ -1,7 +1,7 @@
 import sys
 
 import os.path
-from PySide6.QtCore import Qt, Slot
+from PySide6.QtCore import Qt, Slot, QStandardPaths
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
     QApplication,
@@ -26,12 +26,21 @@ from PySide6.QtWidgets import (
 )
 import model
 
+import configparser
+
 
 class InputOutputPage(QWizardPage):
+    MEMORY_FILE_PATH = os.path.join(
+        QStandardPaths.writableLocation(QStandardPaths.GenericConfigLocation),
+        "PostShow",
+        "memory_file.ini",
+    )
+
     def __init__(self, controller):
         super().__init__()
 
         self.controller = controller
+        self.file_chooser_memory = None
 
         self.setTitle("Choose Input and Output Files")
         self.create_input_box()
@@ -46,21 +55,33 @@ class InputOutputPage(QWizardPage):
         main_layout.addWidget(self._output_group_box)
         self.setLayout(main_layout)
 
-    def show_file_chooser_for_field(self, field, title: str, filters: str):
-        # TODO: save last file location for a particular field and open there next time
-        file_name = QFileDialog.getOpenFileName(
-            self, title, os.path.expanduser("~"), filters
-        )
-        print("show_file_chooser_for_field:", file_name)
-        field.setText(file_name[0])
+    def initializePage(self) -> None:
+        self.file_chooser_memory = configparser.ConfigParser()
+        self.file_chooser_memory.read(self.MEMORY_FILE_PATH)
 
-    def show_folder_chooser_for_field(self, field, title: str):
-        # TODO: default to last location, warn if expected names exist
-        folder_name = QFileDialog.getExistingDirectory(
-            self, title, os.path.expanduser("~")
+    def show_file_chooser_for_field(
+        self, field, field_config_key: str, title: str, filters: str
+    ):
+        default_path = self.file_chooser_memory.get(
+            "DEFAULT", field_config_key, fallback=os.path.expanduser("~")
         )
+        file_name = QFileDialog.getOpenFileName(self, title, default_path, filters)[0]
+        print("show_file_chooser_for_field:", file_name)
+        if file_name != "":
+            field.setText(file_name)
+            new_path = os.path.dirname(file_name)
+            self.file_chooser_memory.set("DEFAULT", field_config_key, new_path)
+
+    def show_folder_chooser_for_field(self, field, field_config_key: str, title: str):
+        # TODO: default to last location, warn if expected names exist
+        default_path = self.file_chooser_memory.get(
+            "DEFAULT", field_config_key, fallback=os.path.expanduser("~")
+        )
+        folder_name = QFileDialog.getExistingDirectory(self, title, default_path)
         print("show_folder_chooser_for_field:", folder_name)
-        field.setText(folder_name)
+        if folder_name != "":
+            field.setText(folder_name)
+            self.file_chooser_memory.set("DEFAULT", field_config_key, folder_name)
 
     def create_input_box(self):
         self._input_group_box = QGroupBox("Input Files")
@@ -79,6 +100,7 @@ class InputOutputPage(QWizardPage):
         self.recording_choose_button.clicked.connect(
             lambda: self.show_file_chooser_for_field(
                 self.recording_file_line,
+                "recording_file",
                 "Final episode recording (WAV or MP3)",
                 "Audio file (*.wav *.mp3)",
             )
@@ -101,6 +123,7 @@ class InputOutputPage(QWizardPage):
         self.chap_choose_button.clicked.connect(
             lambda: self.show_file_chooser_for_field(
                 self.chap_file_line,
+                "chap_file",
                 "Audacity chapter labels file",
                 "Audacity labels (*.csv *.tsv *.txt",
             )
@@ -160,7 +183,7 @@ class InputOutputPage(QWizardPage):
         self.outfolder_choose_button = QPushButton("Choose Folder")
         self.outfolder_choose_button.clicked.connect(
             lambda: self.show_folder_chooser_for_field(
-                self.outfolder_folder_line, "Output folder"
+                self.outfolder_folder_line, "outfolder", "Output folder"
             )
         )
         outfolder_chooser_layout.addWidget(self.outfolder_folder_line)
@@ -185,4 +208,6 @@ class InputOutputPage(QWizardPage):
         self.controller.outdir = self.outfolder_folder_line.text()
         self.controller.markers_file = self.chap_file_line.text()
         self.controller.set_metadata(metadata)
+        with open(self.MEMORY_FILE_PATH, "w") as mf:
+            self.file_chooser_memory.write(mf)
         return True

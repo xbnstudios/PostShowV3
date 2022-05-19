@@ -14,6 +14,8 @@
 import sys
 import traceback
 
+from PySide6.QtCore import QStandardPaths, QUrl
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QApplication,
     QMessageBox,
@@ -30,7 +32,7 @@ import model
 import os
 import tempfile
 import datetime
-import argparse
+import shutil
 
 
 class Controller:
@@ -48,10 +50,9 @@ class Controller:
     8. Exit
     """
 
-    def __init__(self, args, config_data):
+    def __init__(self, config_data):
         self.encoder = model.MP3Encoder()
 
-        self.args = args
         self.config_data = config_data
         self.skip_encoding = False
         self.metadata = None
@@ -219,32 +220,41 @@ class Controller:
         return self.tagger.length_ms
 
 
-def parse_args() -> argparse.Namespace:
-    """Parse arguments to this program."""
-    parser = argparse.ArgumentParser(
-        description="Convert and tag WAVs and chapter metadata for podcasts."
+def config_wizard(default_config_path) -> bool:
+    wizard_box = QMessageBox(
+        QMessageBox.Warning,
+        "No configuration file",
+        "There is no configuration file for PostShow yet. Create one now?",
     )
-    parser.add_argument(
-        "-c",
-        "--config",
-        help="configuration file to use, defaults to $HOME/.config/postshow.ini",
-        default=os.path.expandvars("$HOME/.config/postshow.ini"),
+    quit_button = wizard_box.addButton("Quit", QMessageBox.RejectRole)
+    create_button = wizard_box.addButton("Create", QMessageBox.AcceptRole)
+    wizard_box.exec()
+    if wizard_box.clickedButton() == quit_button:
+        return False
+    config_basedir = os.path.dirname(default_config_path)
+    os.mkdir(config_basedir)
+    basedir = os.path.dirname(__file__)
+    shutil.copyfile(
+        os.path.join(basedir, "..", "..", "data", "template_config.ini"),
+        default_config_path,
     )
-    args = parser.parse_args()
-    errors = []
-    if not os.path.exists(args.config):
-        errors.append("Configuration file ({}) does not exist".format(args.config))
-    if len(errors) > 0:
-        raise model.PostShowError(";\n".join(errors))
-    return args
+    default_config_url = QUrl.fromLocalFile(default_config_path)
+    QDesktopServices.openUrl(default_config_url)
 
 
 def main():
     app = QApplication([])
+    default_config_path = os.path.join(
+        QStandardPaths.writableLocation(QStandardPaths.GenericConfigLocation),
+        "PostShow",
+        "config.ini",
+    )
+    if not os.path.exists(default_config_path):
+        if not config_wizard(default_config_path):
+            return
     try:
-        args = parse_args()
-        config_data = config.check_config(args.config)
-        controller = Controller(args, config_data)
+        config_data = config.check_config(default_config_path)
+        controller = Controller(config_data)
         wizard = PostShowWizard(controller)
         wizard.show()
         sys.exit(app.exec())
@@ -263,7 +273,6 @@ def main():
                 "<br>".join(traceback.format_exception(None, pse, pse.__traceback__))
             )
             qem.exec()
-        exit(1)
 
 
 class PostShowWizard(QWizard):
