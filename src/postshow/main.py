@@ -41,6 +41,7 @@ DEFAULT_CONFIG_PATH = os.path.join(
     "config.ini",
 )
 
+
 class Controller:
     """Define the control flow of the application as a whole.
 
@@ -332,7 +333,6 @@ class PostShowWizard(QWizard):
         default_config_url = QUrl.fromLocalFile(DEFAULT_CONFIG_PATH)
         QDesktopServices.openUrl(default_config_url)
         sys.exit(0)
-
 
 
 if __name__ == "__main__":

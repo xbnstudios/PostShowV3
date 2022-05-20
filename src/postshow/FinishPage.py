@@ -137,7 +137,7 @@ class FinishPage(QWizardPage):
         product_type = QSysInfo.productType()
         p = QProcess()
         if product_type == "windows":
-            p.startDetached("explorer.exe", ['/select,"{}"'.format(path)])
+            p.startDetached("explorer.exe", ["/select,", path])
         elif product_type == "macos":
             p.startDetached("/usr/bin/open", ["-R", path])
         else:
