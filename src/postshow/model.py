@@ -232,7 +232,10 @@ class MP3Encoder(threading.Thread):
     def run(self):
         self.started = True
         basedir = os.path.dirname(__file__)
-        lame_path = os.path.join(basedir, "..", "..", "vendor", "lame")
+        if "DEBUG" in os.environ.keys():
+            lame_path = os.path.join(basedir, "..", "..", "vendor", "lame")
+        else:
+            lame_path = os.path.join(basedir, "vendor", "lame")
         self.p = subprocess.Popen(
             [lame_path, "-t", "-b", self.bitrate, "--cbr", self.infile, self.outfile],
             stdout=subprocess.DEVNULL,

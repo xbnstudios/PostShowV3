@@ -15,7 +15,7 @@ import sys
 import traceback
 from typing import List
 
-from PySide6.QtCore import QStandardPaths, QUrl
+from PySide6.QtCore import QStandardPaths, QUrl, Slot
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QApplication,
@@ -35,6 +35,11 @@ import tempfile
 import datetime
 import shutil
 
+DEFAULT_CONFIG_PATH = os.path.join(
+    QStandardPaths.writableLocation(QStandardPaths.GenericConfigLocation),
+    "PostShow",
+    "config.ini",
+)
 
 class Controller:
     """Define the control flow of the application as a whole.
@@ -253,28 +258,34 @@ def config_wizard(default_config_path) -> bool:
     if wizard_box.clickedButton() == quit_button:
         return False
     config_basedir = os.path.dirname(default_config_path)
-    os.mkdir(config_basedir)
+    try:
+        os.mkdir(config_basedir)
+    except FileExistsError:
+        # We don't care, that's fine.
+        pass
     basedir = os.path.dirname(__file__)
-    shutil.copyfile(
-        os.path.join(basedir, "..", "..", "data", "template_config.ini"),
-        default_config_path,
-    )
+    if "DEBUG" in os.environ.keys():
+        shutil.copyfile(
+            os.path.join(basedir, "..", "..", "data", "template_config.ini"),
+            default_config_path,
+        )
+    else:
+        shutil.copyfile(
+            os.path.join(basedir, "data", "template_config.ini"),
+            default_config_path,
+        )
+
     default_config_url = QUrl.fromLocalFile(default_config_path)
     QDesktopServices.openUrl(default_config_url)
 
 
 def main():
     app = QApplication([])
-    default_config_path = os.path.join(
-        QStandardPaths.writableLocation(QStandardPaths.GenericConfigLocation),
-        "PostShow",
-        "config.ini",
-    )
-    if not os.path.exists(default_config_path):
-        if not config_wizard(default_config_path):
+    if not os.path.exists(DEFAULT_CONFIG_PATH):
+        if not config_wizard(DEFAULT_CONFIG_PATH):
             return
     try:
-        config_data = config.check_config(default_config_path)
+        config_data = config.check_config(DEFAULT_CONFIG_PATH)
         controller = Controller(config_data)
         wizard = PostShowWizard(controller)
         wizard.show()
@@ -300,11 +311,28 @@ class PostShowWizard(QWizard):
     def __init__(self, controller):
         super().__init__()
         self.setButtonText(QWizard.CommitButton, "Encode")
+        self.setButtonText(QWizard.HelpButton, "Open Config")
         self.addPage(IOSetupPage.InputOutputPage(controller))
         self.addPage(MetadataPage.MetadataPage(controller))
         self.addPage(EncoderProgressPage.EncoderProgressPage(controller))
         self.addPage(FinishPage.FinishPage(controller))
         self.setWindowTitle("Encode and Tag Podcast Episode")
+        self.setOption(QWizard.HaveHelpButton, True)
+        self.helpRequested.connect(self.show_config)
+
+    @Slot()
+    def show_config(self):
+        result = QMessageBox.information(
+            self,
+            "Opening Config",
+            "PostShow will open the config file and then quit; relaunch it when "
+            "you're done making config changes.",
+            QMessageBox.StandardButton.Ok
+        )
+        default_config_url = QUrl.fromLocalFile(DEFAULT_CONFIG_PATH)
+        QDesktopServices.openUrl(default_config_url)
+        sys.exit(0)
+
 
 
 if __name__ == "__main__":
