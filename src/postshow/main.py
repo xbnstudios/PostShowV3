@@ -15,7 +15,7 @@ import sys
 import traceback
 from typing import List
 
-from PySide6.QtCore import QStandardPaths, QUrl, Slot
+from PySide6.QtCore import QStandardPaths, QUrl, Slot, QSysInfo, QProcess
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QApplication,
@@ -275,9 +275,7 @@ def config_wizard(default_config_path) -> bool:
             os.path.join(basedir, "data", "template_config.ini"),
             default_config_path,
         )
-
-    default_config_url = QUrl.fromLocalFile(default_config_path)
-    QDesktopServices.openUrl(default_config_url)
+    show_config()
 
 
 def main():
@@ -308,6 +306,25 @@ def main():
             qem.exec()
 
 
+@Slot()
+def show_config():
+    QMessageBox.information(
+        None,
+        "Opening Config",
+        "PostShow will open the config file and then quit; relaunch it when "
+        "you're done making config changes.",
+        QMessageBox.StandardButton.Ok
+    )
+    product_type = QSysInfo.productType()
+    if product_type == "macos":
+        p = QProcess()
+        p.startDetached("open", ["-e", DEFAULT_CONFIG_PATH])
+    else:
+        default_config_url = QUrl.fromLocalFile(DEFAULT_CONFIG_PATH)
+        QDesktopServices.openUrl(default_config_url)
+    sys.exit(0)
+
+
 class PostShowWizard(QWizard):
     def __init__(self, controller):
         super().__init__()
@@ -319,20 +336,7 @@ class PostShowWizard(QWizard):
         self.addPage(FinishPage.FinishPage(controller))
         self.setWindowTitle("Encode and Tag Podcast Episode")
         self.setOption(QWizard.HaveHelpButton, True)
-        self.helpRequested.connect(self.show_config)
-
-    @Slot()
-    def show_config(self):
-        result = QMessageBox.information(
-            self,
-            "Opening Config",
-            "PostShow will open the config file and then quit; relaunch it when "
-            "you're done making config changes.",
-            QMessageBox.StandardButton.Ok
-        )
-        default_config_url = QUrl.fromLocalFile(DEFAULT_CONFIG_PATH)
-        QDesktopServices.openUrl(default_config_url)
-        sys.exit(0)
+        self.helpRequested.connect(show_config)
 
 
 if __name__ == "__main__":
