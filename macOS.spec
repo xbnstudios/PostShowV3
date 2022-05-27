@@ -51,6 +51,6 @@ coll = COLLECT(
 app = BUNDLE(
     coll,
     name='PostShow.app',
-    icon='PostShow Icon.icns',
+    icon='assets/PostShow Icon.icns',
     bundle_identifier="dog.s0ph0s.postshow.v3",
 )

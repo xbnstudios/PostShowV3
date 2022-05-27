@@ -37,7 +37,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon="PostShow Icon.ico",
+    icon="assets/PostShow Icon.ico",
 )
 coll = COLLECT(
     exe,
