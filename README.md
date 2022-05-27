@@ -44,3 +44,10 @@ it kinda looks at home on every platform.  Kinda.
 6. `light.exe ..\..\PostShow.wixobj`
 7. `mv dist dist-win`
 8. On macOS, `poetry run pyinstaller macOS.spec`
+
+## Links
+
+Under the terms of the GPL, these links are made prominently available.
+
+* [LAME Source Code](https://lame.sourceforge.io/download.php)
+* [Qt Source Code](https://www.qt.io/download-open-source#source)

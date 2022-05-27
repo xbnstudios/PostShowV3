@@ -1,0 +1,10 @@
+The source code for this application is available at
+    https://github.com/xbnstudios/PostShowV3/
+
+The source code for the LAME MP3 encoder, which this application distributes, is
+available at
+    https://lame.sourceforge.io/download.php
+
+The source code for the Qt 6 UI toolkit, which this application distributes, is
+available at
+    https://www.qt.io/download-open-source#source
