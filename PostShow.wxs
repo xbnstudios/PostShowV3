@@ -12,7 +12,6 @@
         <Media Id="1" Cabinet="PostShowV3.cab" EmbedCab="yes" />
         <Feature Id="Complete" Level="1">
             <ComponentGroupRef Id="All" />
-            <ComponentRef Id="ProgramMenuDir" />
         </Feature>
 
         <Directory Id="TARGETDIR" Name="SourceDir">
@@ -21,15 +20,6 @@
                 </Directory>
             </Directory>
             <Directory Id="ProgramMenuFolder" Name="Programs">
-                <Directory Id="ProgramMenuDir" Name="PostShow">
-                    <Component Id="ProgramMenuDir"
-                               Guid="05F9EE57-0938-4C0C-BB62-90FC8CB92DE9">
-                        <RemoveFolder Id="ProgramMenuDir" On="uninstall" />
-                        <RegistryValue Root="HKCU"
-                                       Key="Software\[Manufacturer]\[ProductName]"
-                                       Type="string" Value="" KeyPath="yes" />
-                    </Component>
-                </Directory>
             </Directory>
 
             <Directory Id="DesktopFolder" Name="Desktop" />
@@ -114,7 +104,7 @@
                 <File Id="PostShowEXE" Name="PostShow.exe" DiskId="1"
                       Source="PostShow.exe" KeyPath="yes">
                     <Shortcut Id="startmenuPostShow"
-                              Directory="ProgramMenuDir" Name="PostShow"
+                              Directory="ProgramMenuFolder" Name="PostShow"
                               WorkingDirectory="dirFC3B34A000EB7C3831EBA893F80C54CB"
                               Icon="PostShow.ico" IconIndex="0"
                               Advertise="yes" />
@@ -126,6 +116,9 @@
             </Component>
             <Component Id="cmp0F8317948BAFF405DB7B539D92322E19" Directory="dirFC3B34A000EB7C3831EBA893F80C54CB" Guid="{682FCE47-BF1F-4AD7-81AC-12DADF3B1DFA}">
                 <File Id="filAADA90AFAA770CC555C8B7093FBE2827" KeyPath="yes" Source="PostShow.ico" />
+            </Component>
+            <Component Id="cmp8E896AF382C0436CA73234BEE8F53129" Directory="dirFC3B34A000EB7C3831EBA893F80C54CB" Guid="{96581B02-C31D-438C-B9E4-31BD039A8EA8}">
+                <File Id="filF6AA2CD6B4CC4A09A7DB06A98CA1C57D" KeyPath="yes" Source="SOURCE_CODE.txt" />
             </Component>
             <Component Id="cmpC7A6FA986DB429CF05FBCF9D94D5B087" Directory="dirFC3B34A000EB7C3831EBA893F80C54CB" Guid="{771B3BC6-ABEE-4BDF-98CD-6371EA57CA52}">
                 <File Id="fil06328F4FE65358F713942D33A7AA9216" KeyPath="yes" Source="_bz2.pyd" />
