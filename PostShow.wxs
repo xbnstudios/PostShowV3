@@ -3,7 +3,7 @@
     <Product Name="PostShow" Manufacturer="XBN Studios"
             Id="E590F234-129A-4443-96E4-7D3520E159F0"
             UpgradeCode="AE0E4D5F-86E7-49B3-8E49-4669DE5E5FBA"
-            Language="1033" Version="3.0.2">
+            Language="1033" Version="3.0.3">
         <Package Id="*" Keywords="Installer"
                 Description="XBN Studios' podcast encoding and tagging tool with support for chapters."
                 Manufacturer="XBN Studios"

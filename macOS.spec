@@ -53,4 +53,5 @@ app = BUNDLE(
     name='PostShow.app',
     icon='assets/PostShow Icon.icns',
     bundle_identifier="dog.s0ph0s.postshow.v3",
+    version="3.0.3",
 )

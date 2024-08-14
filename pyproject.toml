@@ -1,18 +1,30 @@
-[tool.poetry]
-name = "postshow-v3"
-version = "0.1.0"
-description = "MP3 tagger and encoder wizard for XBN shows."
-authors = ["s0ph0s <s0ph0s-2@users.noreply.github.com>"]
+[tool.pdm]
+distribution = true
 
-[tool.poetry.dependencies]
-python = "^3.8.1"
-PySide6 = "^6"
-mutagen = "^1.45.1"
+[tool.pdm.dev-dependencies]
+dev = [
+    "PyInstaller<6.0,>=5.1",
+]
 
-[tool.poetry.dev-dependencies]
-black = "^21.8b0"
-PyInstaller = "^5.1"
-
+[tool.pdm.build]
+includes = []
 [build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+
+[project]
+name = "postshow-v3"
+version = "3.0.3"
+description = "MP3 tagger and encoder wizard for XBN shows."
+authors = [
+    {name = "s0ph0s", email = "s0ph0s-2@users.noreply.github.com"},
+]
+dependencies = [
+    "PySide6<7,>=6",
+    "mutagen<2.0.0,>=1.45.1",
+]
+requires-python = "<3.13,>=3.8.1"
+readme = "README.md"
+license = {text = "GPL-2.0-or-later"}
+
