@@ -14,7 +14,7 @@ build-backend = "pdm.backend"
 
 
 [project]
-name = "postshow-v3"
+name = "postshow"
 version = "3.0.3"
 description = "MP3 tagger and encoder wizard for XBN shows."
 authors = [
