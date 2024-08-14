@@ -1,29 +1,17 @@
-import sys
-
 from typing import List
 import os.path
-from PySide6.QtCore import Qt, Slot, QStandardPaths
+from PySide6.QtCore import QStandardPaths
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
-    QApplication,
     QComboBox,
-    QDialog,
-    QDialogButtonBox,
-    QGridLayout,
     QGroupBox,
     QFileDialog,
-    QFormLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
-    QMenu,
-    QMenuBar,
     QMessageBox,
     QPushButton,
-    QSpinBox,
-    QTextEdit,
     QVBoxLayout,
-    QWidget,
     QWizardPage,
 )
 import model
@@ -212,7 +200,7 @@ class InputOutputPage(QWizardPage):
             "overwritten if you continue.".format(existing_files)
         )
         overwrite = confirm_box.addButton("Overwrite", QMessageBox.DestructiveRole)
-        cancel = confirm_box.addButton("Cancel", QMessageBox.RejectRole)
+        confirm_box.addButton("Cancel", QMessageBox.RejectRole)
         confirm_box.exec()
         return confirm_box.clickedButton() == overwrite
 

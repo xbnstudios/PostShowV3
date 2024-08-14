@@ -1,28 +1,11 @@
-import sys
 import platform
 
 import random
-from PySide6.QtCore import Qt, QObject, Signal
-from PySide6.QtGui import QIcon
+from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import (
-    QApplication,
-    QComboBox,
-    QDialog,
-    QDialogButtonBox,
-    QGridLayout,
-    QGroupBox,
-    QFormLayout,
-    QHBoxLayout,
     QLabel,
-    QLineEdit,
-    QMenu,
-    QMenuBar,
     QProgressBar,
-    QPushButton,
-    QSpinBox,
-    QTextEdit,
     QVBoxLayout,
-    QWidget,
     QWizardPage,
 )
 
@@ -43,7 +26,8 @@ class EncoderProgressPage(QWizardPage):
     MESSAGE_TEMPLATE = "Feel free to {} while LAME does its magic."
     ACTIVITIES = [
         "hum the Jeopardy! theme",
-        "scroll through Twitter",
+        "scroll through Bluesky",
+        "scroll through Mastodon",
         "mindlessly eject and close your CD tray",
         "take a walk",
         "water your desk plants",

@@ -254,7 +254,7 @@ def config_wizard(default_config_path) -> bool:
         "There is no configuration file for PostShow yet. Create one now?",
     )
     quit_button = wizard_box.addButton("Quit", QMessageBox.RejectRole)
-    create_button = wizard_box.addButton("Create", QMessageBox.AcceptRole)
+    wizard_box.addButton("Create", QMessageBox.AcceptRole)
     wizard_box.exec()
     if wizard_box.clickedButton() == quit_button:
         return False
@@ -296,7 +296,7 @@ def main():
             "An error occurred that could not be automatically resolved.",
         )
         help_button = error_box.addButton("Help", QMessageBox.HelpRole)
-        quit_button = error_box.addButton("Quit", QMessageBox.AcceptRole)
+        error_box.addButton("Quit", QMessageBox.AcceptRole)
         error_box.exec()
         if error_box.clickedButton() == help_button:
             qem = QErrorMessage()

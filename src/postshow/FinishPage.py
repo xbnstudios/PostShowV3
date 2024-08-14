@@ -1,30 +1,15 @@
-import sys
 
-from PySide6.QtCore import Qt, QSysInfo, QProcess, Slot, QModelIndex
+from PySide6.QtCore import QSysInfo, QProcess, Slot, QModelIndex
 from PySide6.QtGui import QIcon, QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import (
     QApplication,
-    QComboBox,
-    QDialog,
-    QDialogButtonBox,
     QGridLayout,
-    QGroupBox,
-    QFileSystemModel,
-    QFormLayout,
-    QHBoxLayout,
     QLabel,
     QLineEdit,
     QListView,
-    QMenu,
-    QMenuBar,
     QMessageBox,
-    QProgressBar,
     QPushButton,
-    QSpinBox,
-    QTextEdit,
     QVBoxLayout,
-    QWidget,
-    QWizard,
     QWizardPage,
 )
 import os.path
@@ -120,7 +105,6 @@ class FinishPage(QWizardPage):
         # Use the default timedelta format: HH:MM:ss.
         self.duration_field.setText(str(mp3_duration))
         for file in self.controller.output_files:
-            filename = os.path.basename(file)
             item = QStandardItem(QIcon(), file)
             item.setEditable(False)
             # Set the data to be the full file path, in case the display string gets
