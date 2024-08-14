@@ -34,16 +34,18 @@ def check_config(path: str) -> configparser.ConfigParser:
         for key in REQUIRED_TEXT_KEYS:
             if key not in so.keys():
                 errors.append(
-                    "[{section}] is missing the required key"
-                    ' "{key}"'.format(section=section, key=key)
+                    "[{section}] is missing the required key" ' "{key}"'.format(
+                        section=section, key=key
+                    )
                 )
         # Verify that the REQUIRED_BOOL_KEYS from above exist in the file,
         # and are boolean values.
         for key in REQUIRED_BOOL_KEYS:
             if key not in so.keys():
                 errors.append(
-                    "[{section}] is missing the required key"
-                    ' "{key}"'.format(section=section, key=key)
+                    "[{section}] is missing the required key" ' "{key}"'.format(
+                        section=section, key=key
+                    )
                 )
             else:
                 if so[key] not in ["True", "False"]:

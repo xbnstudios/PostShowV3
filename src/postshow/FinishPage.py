@@ -1,4 +1,3 @@
-
 from PySide6.QtCore import QSysInfo, QProcess, Slot, QModelIndex
 from PySide6.QtGui import QIcon, QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import (

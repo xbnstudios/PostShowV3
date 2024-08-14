@@ -22,7 +22,6 @@ class ProgressUpdateEmitter(QObject):
 
 
 class EncoderProgressPage(QWizardPage):
-
     MESSAGE_TEMPLATE = "Feel free to {} while LAME does its magic."
     ACTIVITIES = [
         "hum the Jeopardy! theme",

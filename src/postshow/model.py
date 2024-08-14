@@ -8,6 +8,29 @@ import mutagen.mp3
 import subprocess
 import mimetypes
 import os.path
+from mutagen import MutagenError
+from mutagen.id3 import (
+    CHAP,
+    TIT2,
+    WXXX,
+    TLEN,
+    TPE1,
+    TALB,
+    TPOS,
+    TCON,
+    TCOM,
+    TPE2,
+    APIC,
+    TDRC,
+    TRCK,
+    TLAN,
+    COMM,
+    USLT,
+    CTOC,
+    CTOCFlags,
+    PictureType,
+    ID3TimeStamp,
+)
 
 
 class Chapter(object):
@@ -49,18 +72,18 @@ class Chapter(object):
             indexed=self.indexed,
         )
 
-    def as_chap(self) -> mutagen.id3.CHAP:
+    def as_chap(self) -> CHAP:
         """Convert this object into a mutagen CHAP object."""
         sub_frames = []
         if self.text is not None:
             # Fix issue #1 by replacing em-dashes with regular hyphen-minuses
             cleaned_text = self.text.replace("—", "-")
-            sub_frames.append(mutagen.id3.TIT2(text=cleaned_text))
+            sub_frames.append(TIT2(text=cleaned_text))
         if self.url is not None:
-            sub_frames.append(mutagen.id3.WXXX(desc="chapter url", url=self.url))
+            sub_frames.append(WXXX(desc="chapter url", url=self.url))
         if self.image is not None:
             raise NotImplementedError("I haven't done this bit yet.")
-        return mutagen.id3.CHAP(
+        return CHAP(
             element_id=self.elem_id,
             start_time=self.start,
             end_time=self.end,
@@ -71,28 +94,22 @@ class Chapter(object):
 class MP3Tagger(threading.Thread):
     """Tag an MP3."""
 
-    def __init__(self):
+    def __init__(self, path: str, progress_signal):
         """Create a new tagger."""
         super().__init__()
-        self.path = None
-        self.tag = None
-        self.progress_signal = None
-        self.length_ms = None
-
-    def setup(self, path: str, progress_signal):
         self.path = path
         self.progress_signal = progress_signal
         # Create an ID3 tag if none exists
         try:
             self.tag = mutagen.id3.ID3(path)
-        except mutagen.MutagenError:
+        except MutagenError:
             broken = mutagen.id3.ID3FileType(path)
             broken.add_tags(ID3=mutagen.id3.ID3)
             self.tag = broken.ID3()
         # Determine the length of the MP3 and write it to a TLEN frame
         mp3 = mutagen.mp3.MP3(path)
         self.length_ms = int(round(mp3.info.length * 1000, 0))
-        self.tag.add(mutagen.id3.TLEN(text=str(self.length_ms)))
+        self.tag.add(TLEN(text=str(self.length_ms)))
 
     @staticmethod
     def _no_padding(arg):
@@ -105,37 +122,37 @@ class MP3Tagger(threading.Thread):
     def set_title(self, title: str) -> None:
         """Set the title of the MP3."""
         self.tag.delall("TIT2")
-        self.tag.add(mutagen.id3.TIT2(text=title))
+        self.tag.add(TIT2(text=title))
 
     def set_artist(self, artist: str) -> None:
         """Set the artist of the MP3."""
         self.tag.delall("TPE1")
-        self.tag.add(mutagen.id3.TPE1(text=artist))
+        self.tag.add(TPE1(text=artist))
 
     def set_album(self, album: str) -> None:
         """Set the album of the MP3."""
         self.tag.delall("TALB")
-        self.tag.add(mutagen.id3.TALB(text=album))
+        self.tag.add(TALB(text=album))
 
     def set_season(self, season: str) -> None:
         """Set the season of the MP3."""
         self.tag.delall("TPOS")
-        self.tag.add(mutagen.id3.TPOS(text=season))
+        self.tag.add(TPOS(text=season))
 
     def set_genre(self, genre: str) -> None:
         """Set the genre of the MP3."""
         self.tag.delall("TCON")
-        self.tag.add(mutagen.id3.TCON(text=genre))
+        self.tag.add(TCON(text=genre))
 
     def set_composer(self, composer: str) -> None:
         """Set the composer of the MP3."""
         self.tag.delall("TCOM")
-        self.tag.add(mutagen.id3.TCOM(text=composer))
+        self.tag.add(TCOM(text=composer))
 
     def set_accompaniment(self, accompaniment: str) -> None:
         """Set the accompaniment of the MP3."""
         self.tag.delall("TPE2")
-        self.tag.add(mutagen.id3.TPE2(text=accompaniment))
+        self.tag.add(TPE2(text=accompaniment))
 
     def set_cover_art(self, path: str):
         """Set the cover art of the MP3."""
@@ -149,9 +166,9 @@ class MP3Tagger(threading.Thread):
                 data = fp.read()
         except IOError:
             raise PostShowError("Unable to read cover image file.")
-        apic = mutagen.id3.APIC(
+        apic = APIC(
             mime=mime,
-            type=mutagen.id3.PictureType.COVER_FRONT,
+            type=PictureType.COVER_FRONT,
             desc="podcast cover art",
             data=data,
         )
@@ -160,25 +177,25 @@ class MP3Tagger(threading.Thread):
     def set_date(self, year: str) -> None:
         """Set the date of recording of the MP3."""
         self.tag.delall("TDRC")
-        self.tag.add(mutagen.id3.TDRC(text=[mutagen.id3.ID3TimeStamp(year)]))
+        self.tag.add(TDRC(text=[ID3TimeStamp(year)]))
 
     def set_trackno(self, trackno: str) -> None:
         """Set the track number of the MP3."""
         self.tag.delall("TRCK")
-        self.tag.add(mutagen.id3.TRCK(text=trackno))
+        self.tag.add(TRCK(text=trackno))
 
     def set_language(self, language: str) -> None:
         """Set the language of the MP3."""
         self.tag.delall("TLAN")
-        self.tag.add(mutagen.id3.TLAN(text=language))
+        self.tag.add(TLAN(text=language))
 
     def add_comment(self, lang: str, desc: str, comment: str) -> None:
         """Add a comment to the MP3."""
-        self.tag.add(mutagen.id3.COMM(lang=lang, desc=desc, text=[comment]))
+        self.tag.add(COMM(lang=lang, desc=desc, text=[comment]))
 
     def add_lyrics(self, lang: str, desc: str, lyrics: str) -> None:
         """Add lyrics to the MP3."""
-        self.tag.add(mutagen.id3.USLT(lang=lang, desc=desc, text=lyrics))
+        self.tag.add(USLT(lang=lang, desc=desc, text=lyrics))
 
     def add_chapter(self, chapter: Chapter):
         """Add a chapter to the MP3."""
@@ -192,11 +209,11 @@ class MP3Tagger(threading.Thread):
             if chapter.indexed:
                 child_element_ids.append(chapter.elem_id)
         self.tag.add(
-            mutagen.id3.CTOC(
+            CTOC(
                 element_id="toc",
-                flags=mutagen.id3.CTOCFlags.TOP_LEVEL | mutagen.id3.CTOCFlags.ORDERED,
+                flags=CTOCFlags.TOP_LEVEL | CTOCFlags.ORDERED,
                 child_element_ids=child_element_ids,
-                sub_frames=[mutagen.id3.TIT2(text="Primary Chapter List")],
+                sub_frames=[TIT2(text="Primary Chapter List")],
             )
         )
 
@@ -204,46 +221,43 @@ class MP3Tagger(threading.Thread):
 class MP3Encoder(threading.Thread):
     """Shell out to LAME to encode the WAV file as an MP3."""
 
-    def __init__(self):
-        super().__init__()
-        self.infile = None
-        self.outfile = None
-        self.bitrate = None
-        self.matcher = None
-        self.p = None
-        self.percent = 0
-        self.started = False
-        self.finished = False
-        self.progress_updater = None
-
-    def setup(self, infile: str, outfile: str, bitrate: str, progress_updater):
-        """Configure the input and output files, and the encoder bitrate.
-
+    def __init__(self, infile: str, outfile: str, bitrate: str, progress_updater):
+        """
         :param infile: Path to WAV file.
         :param outfile: Path to create MP3 file at.
         :param bitrate: LAME CBR bitrate, in Kbps.
         """
+        super().__init__()
         self.infile = infile
         self.outfile = outfile
         self.bitrate = bitrate
-        self.matcher = re.compile(r"\(([0-9]?[0-9 ][0-9])%\)")
         self.progress_updater = progress_updater
+        self.matcher = re.compile(r"\(([0-9]?[0-9 ][0-9])%\)")
+        self.p = None
+        self.percent = 0
+        self.started = False
+        self.finished = False
 
     def run(self):
         self.started = True
         basedir = os.path.dirname(__file__)
+        lame_path = os.path.join(basedir, "vendor", "lame")
         if "DEBUG" in os.environ.keys():
             lame_path = os.path.join(basedir, "..", "..", "vendor", "lame")
-        else:
-            lame_path = os.path.join(basedir, "vendor", "lame")
-        self.p = subprocess.Popen(
+        p = subprocess.Popen(
             [lame_path, "-t", "-b", self.bitrate, "--cbr", self.infile, self.outfile],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.PIPE,
         )
-        for block in iter(lambda: self.p.stderr.read(1024), ""):
+        self.p = p
+        if not p:
+            raise PostShowError("failed to start encoder")
+        stderr = p.stderr
+        if stderr is None:
+            raise PostShowError("this shouldn't happen")
+        for block in iter(lambda: stderr.read(1024), ""):
             # Stop when the process terminates.
-            if self.p.poll() is not None:
+            if p.poll() is not None:
                 break
             text = block.decode("utf-8")
             groups = self.matcher.findall(text)
@@ -252,7 +266,7 @@ class MP3Encoder(threading.Thread):
             percent = int(groups[-1])
             self.percent = percent
             self.progress_updater.set_progress(percent)
-            if percent == 100 and self.p.poll() is not None:
+            if percent == 100 and p.poll() is not None:
                 break
         self.finished = True
         self.progress_updater.set_finished()
@@ -437,9 +451,10 @@ class MCS:
                     )
                 text, url = self._split_url(label)
                 previous = (millisec, text, url)
-            self.chapters.append(
-                Chapter(previous[0], previous[0], text=previous[1], url=previous[2])
-            )
+            if previous is not None:
+                self.chapters.append(
+                    Chapter(previous[0], previous[0], text=previous[1], url=previous[2])
+                )
 
     def save(self, path: str, marker_type: int):
         if marker_type == self.LRC:

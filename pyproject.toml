@@ -12,11 +12,14 @@ includes = []
 requires = ["pdm-backend"]
 build-backend = "pdm.backend"
 
+[tool.pdm.scripts]
+dist-mac = "pyinstaller macOS.spec"
+dist-win = "pyinstaller Windows.spec"
 
 [project]
 name = "postshow"
 version = "3.0.3"
-description = "MP3 tagger and encoder wizard for XBN shows."
+description = "XBN Studios' podcast encoding and tagging tool with support for chapters."
 authors = [
     {name = "s0ph0s", email = "s0ph0s-2@users.noreply.github.com"},
 ]

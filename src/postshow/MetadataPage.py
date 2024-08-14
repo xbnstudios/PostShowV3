@@ -9,7 +9,6 @@ from PySide6.QtWidgets import (
 
 
 class MetadataPage(QWizardPage):
-
     BASIC_FIELDS = [
         "Title",
         "Album",

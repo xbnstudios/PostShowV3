@@ -197,7 +197,7 @@ class InputOutputPage(QWizardPage):
             QMessageBox.Warning,
             "Overwrite existing files?",
             "The output folder you selected contains files {} that will be "
-            "overwritten if you continue.".format(existing_files)
+            "overwritten if you continue.".format(existing_files),
         )
         overwrite = confirm_box.addButton("Overwrite", QMessageBox.DestructiveRole)
         confirm_box.addButton("Cancel", QMessageBox.RejectRole)

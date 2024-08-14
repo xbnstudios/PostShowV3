@@ -58,41 +58,44 @@ class Controller:
     """
 
     def __init__(self, config_data):
-        self.encoder = model.MP3Encoder()
-
+        self.encoder: model.MP3Encoder | None = None
         self.config_data = config_data
         self.skip_encoding = False
         self.metadata = None
         self.mp3_path = None
         self.chapters = None
-        self.tmp_path = None
+        self.tmp_path = tempfile.TemporaryDirectory()
         self.outdir = None
-        self.tagger = None
+        self.tagger: model.MP3Tagger | None = None
         self.profile = "default"
         self.encoder_progress_signal = EncoderProgressPage.ProgressUpdateEmitter()
         self.output_files = []
+        self.markers_file = None
 
     def exit_handler(self):
-        self.encoder.request_stop()
+        if self.encoder:
+            self.encoder.request_stop()
 
     def reset_encoder(self):
-        self.encoder.request_stop()
-        try:
-            self.encoder.join()
-        except RuntimeError:
-            print("I tried to stop the encoder, but it wasn't running. This is fine.")
-        self.encoder = model.MP3Encoder()
-        self.output_files = []
-        print("Encoder reset")
+        if self.encoder:
+            self.encoder.request_stop()
+            try:
+                self.encoder.join()
+            except RuntimeError:
+                print(
+                    "I tried to stop the encoder, but it wasn't running. This is fine."
+                )
+            self.encoder = None
+            self.output_files = []
+            print("Encoder reset")
 
     def start_encoder(self, wav_path):
         # Encode the mp3 to a temp file first, then move it later
-        self.tmp_path = tempfile.TemporaryDirectory()
         if not self.skip_encoding:
             self.mp3_path = self.build_output_file_path(
                 "mp3", parent=self.tmp_path.name
             )
-            self.encoder.setup(
+            self.encoder = model.MP3Encoder(
                 wav_path,
                 self.mp3_path,
                 self.config_data.get(self.profile, "bitrate"),
@@ -102,13 +105,15 @@ class Controller:
             self.encoder.start()
 
     def check_before_wreck(self) -> List[str]:
-        outfiles = [self.build_output_file_path("mp3"),
-                    self.build_output_file_path("lrc"),
-                    self.build_output_file_path("cue"),
-                    self.build_output_file_path("txt")]
+        outfiles = [
+            self.build_output_file_path("mp3"),
+            self.build_output_file_path("lrc"),
+            self.build_output_file_path("cue"),
+            self.build_output_file_path("txt"),
+        ]
         files_that_exist = []
         for file in outfiles:
-            if os.path.exists(file):
+            if file and os.path.exists(file):
                 files_that_exist.append(file)
         return files_that_exist
 
@@ -123,7 +128,7 @@ class Controller:
             self.encoder.request_stop()
             self.encoder.join()
 
-    def build_output_file_path(self, ext: str, parent=None):
+    def build_output_file_path(self, ext: str, parent=None) -> str:
         """Create the path for an output file with the given extension.
 
         This requires a bunch of code, which would be better in its own
@@ -146,27 +151,34 @@ class Controller:
         mcs = model.MCS(
             metadata=self.metadata, media_filename=self.build_output_file_path("mp3")
         )
-        mcs.load(self.markers_file)
-        self.chapters = mcs.get()
-        lrc_path = self.build_output_file_path("lrc")
-        cue_path = self.build_output_file_path("cue")
-        txt_path = self.build_output_file_path("txt")
-        mcs.save(lrc_path, model.MCS.LRC)
-        mcs.save(cue_path, model.MCS.CUE)
-        mcs.save(txt_path, model.MCS.SIMPLE)
-        self.output_files.append(lrc_path)
-        self.output_files.append(cue_path)
-        self.output_files.append(txt_path)
-        self.metadata.lyrics = "\n".join([chapter.text for chapter in self.chapters])
+        if self.markers_file:
+            mcs.load(self.markers_file)
+            self.chapters = mcs.get()
+            lrc_path = self.build_output_file_path("lrc")
+            cue_path = self.build_output_file_path("cue")
+            txt_path = self.build_output_file_path("txt")
+            mcs.save(lrc_path, model.MCS.LRC)
+            mcs.save(cue_path, model.MCS.CUE)
+            mcs.save(txt_path, model.MCS.SIMPLE)
+            self.output_files.append(lrc_path)
+            self.output_files.append(cue_path)
+            self.output_files.append(txt_path)
+            if self.metadata:
+                self.metadata.lyrics = "\n".join(
+                    [chapter.text for chapter in self.chapters]
+                )
+        else:
+            print("markers_file was None")
 
     def do_tag(self):
         """Tag the file, and do step 8.
 
         8. Exit
         """
-        t = model.MP3Tagger()
+        if not self.metadata:
+            return
+        t = model.MP3Tagger(self.mp3_path, self.encoder_progress_signal)
         self.tagger = t
-        t.setup(self.mp3_path, self.encoder_progress_signal)
         t.set_title(self.metadata.title)
         t.set_album(self.metadata.album)
         t.set_artist(self.metadata.artist)
@@ -204,14 +216,16 @@ class Controller:
         self.mp3_path = self.build_output_file_path("mp3")
         # Join the encoder thread, since tagging can't occur until it is
         # done
-        if not self.skip_encoding:
+        if not self.skip_encoding and self.encoder:
             self.encoder.join()
-            shutil.move(
-                self.build_output_file_path("mp3", parent=self.tmp_path.name),
-                self.mp3_path,
-            )
-            self.output_files.append(self.mp3_path)
-            self.tmp_path.cleanup()
+            output_mp3 = self.build_output_file_path("mp3", parent=self.tmp_path.name)
+            if output_mp3 and self.mp3_path:
+                shutil.move(
+                    output_mp3,
+                    self.mp3_path,
+                )
+                self.output_files.append(self.mp3_path)
+                self.tmp_path.cleanup()
 
     def complete_metadata(self, profile_name: str) -> None:
         """Complete the metadata using the config file.
@@ -220,6 +234,8 @@ class Controller:
         the user and combine them into the complete information for this
         episode.
         """
+        if not self.metadata:
+            return
         self.metadata.title = self.config_data.get(profile_name, "title").format(
             slug=self.config_data.get(profile_name, "slug"),
             epnum=self.metadata.number,
@@ -243,8 +259,11 @@ class Controller:
         if self.config_data.getboolean(profile_name, "lyrics_equals_comment"):
             self.metadata.comment = self.metadata.lyrics
 
-    def get_mp3_length_ms(self):
-        return self.tagger.length_ms
+    def get_mp3_length_ms(self) -> int:
+        if self.tagger:
+            return self.tagger.length_ms
+        else:
+            return 0
 
 
 def config_wizard(default_config_path) -> bool:
@@ -276,6 +295,7 @@ def config_wizard(default_config_path) -> bool:
             default_config_path,
         )
     show_config()
+    return True
 
 
 def main():
@@ -313,7 +333,7 @@ def show_config():
         "Opening Config",
         "PostShow will open the config file and then quit; relaunch it when "
         "you're done making config changes.",
-        QMessageBox.StandardButton.Ok
+        QMessageBox.StandardButton.Ok,
     )
     product_type = QSysInfo.productType()
     if product_type == "macos":
